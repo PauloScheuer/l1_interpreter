@@ -26,8 +26,9 @@ type tipo =
     TyInt
   | TyBool
   | TyFn     of tipo * tipo
-  | TyPair   of tipo * tipo 
+  | TyPair   of tipo * tipo
   | TyVar    of int   (* variáveis de tipo -- números *)
+  | TyMaybe of tipo
                       
 type politipo = (int list) * tipo
   
@@ -41,6 +42,7 @@ let rec ftv (tp:tipo) : int list =
   | TyFn(t1,t2)    
   | TyPair(t1,t2) ->  (ftv t1) @ (ftv t2)
   | TyVar n      -> [n]
+  | TyMaybe(e) -> ftv e
 
 
                    
@@ -53,6 +55,7 @@ let rec tipo_str (tp:tipo) : string =
   | TyFn   (t1,t2)  -> "("  ^ (tipo_str t1) ^ "->" ^ (tipo_str t2) ^ ")"
   | TyPair (t1,t2)  -> "("  ^ (tipo_str t1) ^  "*" ^ (tipo_str t2) ^ ")" 
   | TyVar  n        -> "X" ^ (string_of_int n)
+  | TyMaybe t -> "Maybe "^(tipo_str t)
                              
   
 
@@ -77,6 +80,8 @@ type expr  =
   | Let    of ident * expr * expr           
   | LetRec of ident * ident * expr * expr 
   | Pipe   of expr * expr
+  | Nothing
+  | Just of expr
               
 
 
@@ -112,6 +117,8 @@ let rec expr_str (e:expr) : string  =
   | LetRec (f,x,e1,e2) -> "(let rec " ^ f ^ "= fn " ^ x ^ " => "
                           ^ (expr_str e1) ^ "\nin " ^ (expr_str e2) ^ " )"
   | Pipe (e1,e2) -> (expr_str e1) ^ "|>" ^ (expr_str e2)
+  | Nothing -> "nothing"
+  | Just e -> "just "^(expr_str e)
 
 
          
@@ -197,6 +204,7 @@ let rec appsubs (s:subst) (tp:tipo) : tipo =
   | TyVar  x        -> (match lookup s x with
         None        -> TyVar x
       | Some tp'    -> tp') 
+  | TyMaybe t       -> appsubs s t
                          
   
 
@@ -223,6 +231,7 @@ let rec var_in_tipo (v:int) (tp:tipo) : bool =
   | TyFn     (t1,t2)  -> (var_in_tipo v t1) || (var_in_tipo v t2)
   | TyPair   (t1,t2)  -> (var_in_tipo v t1) || (var_in_tipo v t2) 
   | TyVar  x          -> v=x
+  | TyMaybe t         -> var_in_tipo v t
                          
 
 (* cria novas variáveis para politipos quando estes são instanciados *)
@@ -358,6 +367,14 @@ let rec collect (g:tyenv) (e:expr) : (equacoes_tipo * tipo)  =
       let tA       = newvar()       in
       (c1@c2@[(tp2,TyFn(tp1,TyVar tA))]
       , TyVar tA)
+
+  | Nothing ->
+      let tX       = newvar()       in
+      let tP = TyVar tX in
+      ([],TyMaybe tP)
+  | Just e ->
+      let (c,tp) = collect  g e in
+      (c,TyMaybe tp)
  
       
 
@@ -404,6 +421,8 @@ type valor =
   | VPair  of valor * valor 
   | VClos  of ident * expr * renv
   | VRclos of ident * ident * expr * renv
+  | VNothing
+  | VJust of valor
 and
   renv = (ident * valor) list
    
@@ -499,6 +518,11 @@ let rec eval (renv:renv) (e:expr) : valor =
            in eval renv''' ebdy
        | _ -> raise BugTypeInfer)
 
+  | Nothing -> VNothing
+  | Just e ->
+      let v = eval renv e in
+      VJust v
+
 (* Exemplos e testes *)
 (* Pipe *)
 let exPipe1 = Pipe(Num 1,Fn("x", Binop(Sub, Var "x", Num 1)))
@@ -515,8 +539,11 @@ let exfat =
 
 
 let exPipe4 = Pipe(Num 4, exfat)
-       
-        
 
- 
+(* Maybe *)
+let exMaybe1 = Nothing
+let exMaybe2 = Just(Num 1)
+let exMaybe3 = Just(Nothing)
+let exMaybe4 = Just(Var "x")
+let exMaybe5 = Just(Binop(Sub,Num 5,Num 3))
  
