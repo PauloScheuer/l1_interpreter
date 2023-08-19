@@ -76,6 +76,7 @@ type expr  =
   | App    of expr * expr
   | Let    of ident * expr * expr           
   | LetRec of ident * ident * expr * expr 
+  | Pipe   of expr * expr
               
 
 
@@ -110,7 +111,8 @@ let rec expr_str (e:expr) : string  =
                      ^ (expr_str e2) ^ " )"
   | LetRec (f,x,e1,e2) -> "(let rec " ^ f ^ "= fn " ^ x ^ " => "
                           ^ (expr_str e1) ^ "\nin " ^ (expr_str e2) ^ " )"
-                          
+  | Pipe (e1,e2) -> (expr_str e1) ^ "|>" ^ (expr_str e2)
+
 
          
 (* ambientes de tipo - modificados para polimorfismo *) 
@@ -349,6 +351,13 @@ let rec collect (g:tyenv) (e:expr) : (equacoes_tipo * tipo)  =
 
       let (c2,tp2) = collect g' e2                          in
       (c1@[(tp1,TyVar tB)]@c2, tp2)
+
+  | Pipe (e1,e2) ->
+      let (c1,tp1) = collect  g e1 in
+      let (c2,tp2) = collect  g e2  in
+      let tA       = newvar()       in
+      (c1@c2@[(tp2,TyFn(tp1,TyVar tA))]
+      , TyVar tA)
  
       
 
@@ -475,6 +484,20 @@ let rec eval (renv:renv) (e:expr) : valor =
   | LetRec(f,x,e1,e2)  ->
       let renv'= update renv f (VRclos(f,x,e1,renv))
       in eval renv' e2
+
+  | Pipe(e1,e2) ->
+      let v1 = eval renv e1 in
+      let v2 = eval renv e2 in
+      (match v2 with
+         VClos(x,ebdy,renv') ->
+           let renv'' = update renv' x v1
+           in eval renv'' ebdy
+
+       | VRclos(f,x,ebdy,renv') ->
+           let renv''  = update renv' x v1 in
+           let renv''' = update renv'' f v2
+           in eval renv''' ebdy
+       | _ -> raise BugTypeInfer)
        
         
 
