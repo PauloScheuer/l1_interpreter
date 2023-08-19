@@ -498,6 +498,23 @@ let rec eval (renv:renv) (e:expr) : valor =
            let renv''' = update renv'' f v2
            in eval renv''' ebdy
        | _ -> raise BugTypeInfer)
+
+(* Exemplos e testes *)
+(* Pipe *)
+let exPipe1 = Pipe(Num 1,Fn("x", Binop(Sub, Var "x", Num 1)))
+let exPipe2 = Pipe(Num 10,Fn("x", Binop(Sub, Var "x", Num 1)))
+let exPipe3 = Pipe(Bool true,Fn("x", Binop(Sub, Var "x", Num 1)))
+let exPipe4 = Pipe(Pipe(Num 10,Fn("x", Binop(Mult, Var "x", Num 3))), Fn("x", Binop(Sub, Var "x", Num 1)))
+
+let xs1 = Binop(Sub, Var "x", Num 1)
+let fatapp  =   App(Var "fat", xs1)
+let xfat =Binop(Mult, Var "x", fatapp)
+let exprfat =  If(Binop(Eq, Var "x", Num 1) , Num 1, xfat)
+let exfat =
+  LetRec("fat", "x", exprfat, Var "fat")
+
+
+let exPipe4 = Pipe(Num 4, exfat)
        
         
 
