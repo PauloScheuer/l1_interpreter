@@ -26,3 +26,18 @@ Just:
 ρ ⊢ e ⇓ v
 --------------------
 ρ ⊢ just e ⇓ just v
+
+
+Match:
+
+(BS-MATCHNOTHING):
+
+ρ ⊢ e1 ⇓ nothing    ρ ⊢ e2 ⇓ v
+--------------------------------------------------
+ρ ⊢ match e1 with nothing ⇒ e2 | just x ⇒ e3 ⇓ v
+
+(BS-MATCHJUST):
+
+ρ ⊢ e1 ⇓ just x    ρ ⊢ e3 ⇓ v
+--------------------------------------------------
+ρ ⊢ match e1 with nothing ⇒ e2 | just x ⇒ e3 ⇓ v

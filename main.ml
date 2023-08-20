@@ -82,6 +82,7 @@ type expr  =
   | Pipe   of expr * expr
   | Nothing
   | Just of expr
+  | MatchNothingJust of expr * expr * expr
               
 
 
@@ -119,6 +120,7 @@ let rec expr_str (e:expr) : string  =
   | Pipe (e1,e2) -> (expr_str e1) ^ "|>" ^ (expr_str e2)
   | Nothing -> "nothing"
   | Just e -> "just "^(expr_str e)
+  | MatchNothingJust (e1,e2,e3) -> "(match "^(expr_str e1)^" with nothing => "^(expr_str e2)^" | just x => "^(expr_str e3)
 
 
          
@@ -262,6 +264,8 @@ let rec unify (c:equacoes_tipo) : subst =
           (unify (appconstr [(x1,tp2)] c'))
           [(x1,tp2)]  
 
+  | (TyMaybe(x1),TyMaybe(x2)) :: c'         -> unify ((x1,x2)::c')
+
   | (tp1,TyVar x2)::c'                  -> if var_in_tipo x2 tp1
       then raise (UnifyFail(tp1,TyVar x2))
       else compose
@@ -269,8 +273,8 @@ let rec unify (c:equacoes_tipo) : subst =
           [(x2,tp1)]
 
   | (tp1,tp2)::c' -> raise (UnifyFail(tp1,tp2))
-                       
-                       
+
+
 
 exception CollectFail of string
 
@@ -372,10 +376,19 @@ let rec collect (g:tyenv) (e:expr) : (equacoes_tipo * tipo)  =
       let tX       = newvar()       in
       let tP = TyVar tX in
       ([],TyMaybe tP)
+
   | Just e ->
       let (c,tp) = collect  g e in
       (c,TyMaybe tp)
- 
+
+  | MatchNothingJust(e1,e2,e3) ->
+      let (c1,tp1) = collect g e1 in
+      let (c2,tp2) = collect g e2 in
+      let (c3,tp3) = collect g e3 in
+      let tX       = newvar()     in
+      let tP = TyVar tX in
+      (c1@c2@c3@[(tp1,TyMaybe tP);(tp2,tp3)], tp2)
+
       
 
 (* INFERÊNCIA DE TIPOS - CHAMADA PRINCIPAL *)
@@ -519,9 +532,16 @@ let rec eval (renv:renv) (e:expr) : valor =
        | _ -> raise BugTypeInfer)
 
   | Nothing -> VNothing
+
   | Just e ->
       let v = eval renv e in
       VJust v
+
+  | MatchNothingJust(e1,e2,e3) ->
+      (match eval renv e1 with
+         VNothing -> eval renv e2
+       | VJust e -> eval renv e3
+       | _ -> raise BugTypeInfer )
 
 (* Exemplos e testes *)
 (* Pipe *)
@@ -546,4 +566,11 @@ let exMaybe2 = Just(Num 1)
 let exMaybe3 = Just(Nothing)
 let exMaybe4 = Just(Var "x")
 let exMaybe5 = Just(Binop(Sub,Num 5,Num 3))
+let exMaybe6 = MatchNothingJust(Nothing,Num 5, Num 6)
+
+let aux1 = Num 1
+let exMaybe7 = MatchNothingJust(Just aux1, aux1, Num 2)
+let exMaybe8 = MatchNothingJust(Num 5,Num 1,Num 2)
+let exMaybe9 = MatchNothingJust(Nothing,Num 1,Bool true)
+let exMaybe10 = MatchNothingJust(Just (Num 2),Just (Num 3), Just (Bool false))
  
