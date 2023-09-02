@@ -29,6 +29,7 @@ type tipo =
   | TyPair   of tipo * tipo
   | TyVar    of int   (* variáveis de tipo -- números *)
   | TyMaybe of tipo
+  | TyList of tipo
                       
 type politipo = (int list) * tipo
   
@@ -56,6 +57,7 @@ let rec tipo_str (tp:tipo) : string =
   | TyPair (t1,t2)  -> "("  ^ (tipo_str t1) ^  "*" ^ (tipo_str t2) ^ ")" 
   | TyVar  n        -> "X" ^ (string_of_int n)
   | TyMaybe t -> "Maybe "^(tipo_str t)
+  | TyList t -> (tipo_str t)^" List"
                              
   
 
@@ -83,6 +85,9 @@ type expr  =
   | Nothing
   | Just of expr
   | MatchNothingJust of expr * expr * expr
+  | Nil
+  | List of expr * expr
+  | MatchList of expr * expr * expr * ident * ident
               
 
 
@@ -121,8 +126,9 @@ let rec expr_str (e:expr) : string  =
   | Nothing -> "nothing"
   | Just e -> "just "^(expr_str e)
   | MatchNothingJust (e1,e2,e3) -> "(match "^(expr_str e1)^" with nothing => "^(expr_str e2)^" | just x => "^(expr_str e3)
-
-
+  | Nil -> "nil"
+  | List (e1, e2) -> (expr_str e1) ^ " :: (" ^ (expr_str e2) ^ ")"
+  | MatchList (e1, e2, e3, x, xs) -> "match " ^ (expr_str e1) ^ " with nil -> " ^ (expr_str e2) ^ " | " ^ x ^ "::" ^ xs ^ " -> " ^ expr_str(e3)
          
 (* ambientes de tipo - modificados para polimorfismo *) 
  
@@ -436,6 +442,8 @@ type valor =
   | VRclos of ident * ident * expr * renv
   | VNothing
   | VJust of valor
+  | VNil 
+  | VList of valor * valor
 and
   renv = (ident * valor) list
    
@@ -543,7 +551,51 @@ let rec eval (renv:renv) (e:expr) : valor =
        | VJust e -> eval renv e3
        | _ -> raise BugTypeInfer )
 
+  | Nil -> VNil
+
+  | List(e1, e2) -> 
+      let v1 = eval renv e1 in
+      let v2 = eval renv e2 in
+      VList (v1, v2) 
+
+  | MatchList(e1, e2, e3, x, xs) ->
+      (match eval renv e1 with
+         VNil -> eval renv e2
+       | VList(v1, v2) ->
+           let renv' = update renv x v1  in
+           let renv'' = update renv' xs v2 in
+           eval renv'' e3
+       | _ -> raise BugTypeInfer)
+
+      
+
+
 (* Exemplos e testes *)
+
+(* Nil *)
+let exNil = Nil
+
+(* List *)
+let exList1 = List(Num 10, List(Binop(Sum, Num 10, Num 10), Binop(Sub, Num 10, Num 10)))
+let exList2 = List(Num 10, List(App(Num 10, Fn("x", Binop(Sum, Var "x", Num 10))), Binop(Sub, Num 10, Num 10))) 
+
+(* Match-List *)
+let exMatchList1 = MatchList(
+    exList1,
+    Num 0,
+    Var "x",
+    "x",
+    "xs"
+  )
+let exMatchList2 = LetRec(
+    "Soma", 
+    "l", 
+    MatchList(
+      Var "l", 
+      Num 0, 
+      Binop(Sum, Var "x", App(Var "Soma", Var "xs")), "x", "xs"), 
+    App(Var "Soma", exList1)) 
+
 (* Pipe *)
 let exPipe1 = Pipe(Num 1,Fn("x", Binop(Sub, Var "x", Num 1)))
 let exPipe2 = Pipe(Num 10,Fn("x", Binop(Sub, Var "x", Num 1)))

@@ -1,3 +1,34 @@
+Nil:
+
+(BS-NIL)
+
+ρ ⊢ nil ⇓ nil
+
+
+List:
+
+(BS-LIST)
+
+ρ ⊢ e1 ⇓ v1  ρ ⊢ e2 ⇓ v2
+--------------------
+ρ ⊢ e1::e2 ⇓ v1::v2
+
+
+Match List:
+
+(BS-MATCHLIST-NIL)
+
+ρ ⊢ e1 ⇓ nil   ρ ⊢ e2 ⇓ v
+---------------------------------------------
+ρ ⊢ match e1 with nil -> e2 | x::xs -> e3 ⇓ v
+
+(BS-MATCHLIST-NIL)
+
+ρ ⊢ e1 ⇓ v1::v2    ρ', x → v1, xs → v2 ⊢ e3 ⇓ v3
+------------------------------------------------
+ρ ⊢ match e1 with nil -> e2 | x::xs -> e3 ⇓ v3
+
+
 Pipe:
 
 (BS-PIPE):
@@ -18,6 +49,7 @@ Nothing:
 (BS-NOTHING):
 
 ρ ⊢ nothing ⇓ nothing
+
 
 Just:
 
