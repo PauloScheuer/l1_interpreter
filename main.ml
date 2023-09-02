@@ -44,6 +44,7 @@ let rec ftv (tp:tipo) : int list =
   | TyPair(t1,t2) ->  (ftv t1) @ (ftv t2)
   | TyVar n      -> [n]
   | TyMaybe(e) -> ftv e
+  | TyList(e) -> ftv e
 
 
                    
@@ -213,6 +214,8 @@ let rec appsubs (s:subst) (tp:tipo) : tipo =
         None        -> TyVar x
       | Some tp'    -> tp') 
   | TyMaybe t       -> appsubs s t
+  | TyList t        -> TyList (appsubs s t)
+
                          
   
 
@@ -240,6 +243,7 @@ let rec var_in_tipo (v:int) (tp:tipo) : bool =
   | TyPair   (t1,t2)  -> (var_in_tipo v t1) || (var_in_tipo v t2) 
   | TyVar  x          -> v=x
   | TyMaybe t         -> var_in_tipo v t
+  | TyList t          -> var_in_tipo v t 
                          
 
 (* cria novas variáveis para politipos quando estes são instanciados *)
@@ -271,6 +275,8 @@ let rec unify (c:equacoes_tipo) : subst =
           [(x1,tp2)]  
 
   | (TyMaybe(x1),TyMaybe(x2)) :: c'         -> unify ((x1,x2)::c')
+
+  | (TyList(x1), TyList(x2)) :: c'          -> unify ((x1, x2) :: c')
 
   | (tp1,TyVar x2)::c'                  -> if var_in_tipo x2 tp1
       then raise (UnifyFail(tp1,TyVar x2))
@@ -394,6 +400,20 @@ let rec collect (g:tyenv) (e:expr) : (equacoes_tipo * tipo)  =
       let tX       = newvar()     in
       let tP = TyVar tX in
       (c1@c2@c3@[(tp1,TyMaybe tP);(tp2,tp3)], tp2)
+
+  | Nil -> 
+      let tX = newvar() in
+      let tP = TyVar tX in
+      ([], TyList tP)
+
+  | List(e1, e2) -> 
+      let (c1, tp1) = collect g e1 in
+      let (c2, tp2) = collect g e2 in
+      let tx        = newvar()     in
+      let tP        = TyVar tx in
+      (c1@c2@[(tp1, tP); (tp2, TyList(tP))], TyList(tP))
+
+  | MatchList(e1, e2, e3, x, xs) ->  ([], TyList TyBool)
 
       
 
@@ -576,8 +596,13 @@ let rec eval (renv:renv) (e:expr) : valor =
 let exNil = Nil
 
 (* List *)
-let exList1 = List(Num 10, List(Binop(Sum, Num 10, Num 10), Binop(Sub, Num 10, Num 10)))
-let exList2 = List(Num 10, List(App(Num 10, Fn("x", Binop(Sum, Var "x", Num 10))), Binop(Sub, Num 10, Num 10))) 
+let exList1 = List(Num 10, List(Binop(Sum, Num 10, Num 10), Nil))
+let exList2 = List(Num 10, List(App(Fn("x", Binop(Sum, Var "x", Num 10)), Num 10), Nil)) 
+let exList3 = List(Bool true, List(App(Fn("x", Binop(Sum, Var "x", Num 10)), Num 10), Nil)) (* erro! *)
+let exList4 = List(Bool true, List(App(Fn("x", Binop(Geq, Var "x", Num 10)), Num 10), Nil))
+let exList5 = List(Bool true, List(Bool false, Nil))
+
+
 
 (* Match-List *)
 let exMatchList1 = MatchList(

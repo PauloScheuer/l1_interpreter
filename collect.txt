@@ -1,8 +1,27 @@
+Nil:
+
+X new
+----------------
+Γ ⊢ nil : X List
+
+
+List:
+
+Γ ⊢ e1 : T1 | C1   Γ ⊢ e2 : T2 | C2   X new
+------------------------------------------------
+Γ ⊢ e1::e2 : T List | C1 ∪ C2 ∪ {T1 = X} ∪ {T2 = X List}
+
+
+Match List:
+
+
+
 Pipe:
 
 Γ ⊢ e1: T1 | C1   Γ ⊢ e2: T2 | C2   X new
 ------------------------------------------
 Γ ⊢ e1 |> e2 : X | C1 ∪ C2 ∪ {T2 = T1 → X}
+
 
 Nothing:
 
@@ -10,11 +29,13 @@ X new
 ---------------------
 Γ ⊢ nothing : maybe X
 
+
 Just:
 
 Γ ⊢ e: T | C
 ------------------------
 Γ ⊢ Just e: maybe T | C
+
 
 Match:
 
