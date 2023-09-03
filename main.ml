@@ -413,7 +413,15 @@ let rec collect (g:tyenv) (e:expr) : (equacoes_tipo * tipo)  =
       let tP        = TyVar tx in
       (c1@c2@[(tp1, tP); (tp2, TyList(tP))], TyList(tP))
 
-  | MatchList(e1, e2, e3, x, xs) ->  ([], TyList TyBool)
+  | MatchList(e1, e2, e3, x, xs) ->  
+      let tx        = newvar()     in
+      let tP        = TyVar tx in
+      let (c1, tp1) = collect g e1 in
+      let (c2, tp2) = collect g e2 in
+      let g'        = (x, ([], tP))::g in
+      let g''       = (xs, ([], TyList(tP)))::g' in
+      let (c3, tp3) = collect g'' e3 in
+      (c1@c2@c3@[(tp2, tp3); (tp1, TyList(tP))], tp2)
 
       
 
@@ -601,7 +609,7 @@ let exList2 = List(Num 10, List(App(Fn("x", Binop(Sum, Var "x", Num 10)), Num 10
 let exList3 = List(Bool true, List(App(Fn("x", Binop(Sum, Var "x", Num 10)), Num 10), Nil)) (* erro! *)
 let exList4 = List(Bool true, List(App(Fn("x", Binop(Geq, Var "x", Num 10)), Num 10), Nil))
 let exList5 = List(Bool true, List(Bool false, Nil))
-
+let exList6 = List(Bool true, List(Bool true, Nil))
 
 
 (* Match-List *)
@@ -620,6 +628,23 @@ let exMatchList2 = LetRec(
       Num 0, 
       Binop(Sum, Var "x", App(Var "Soma", Var "xs")), "x", "xs"), 
     App(Var "Soma", exList1)) 
+let exMatchList3 = LetRec(
+    "Count",
+    "l",
+    MatchList(
+      Var "l",
+      Num 0,
+      Binop(Sum, Num 1, App(Var "Count", Var "tl")), "hd", "tl"),
+    App(Var "Count", exList1))
+let exMatchList4 = LetRec(
+  "Count",
+  "l",
+  MatchList(
+    Var "l",
+    Num 0,
+    Binop(Sum, Num 1, App(Var "Count", Var "tl")), "hd", "tl"),
+  App(Var "Count", exList5))
+    
 
 (* Pipe *)
 let exPipe1 = Pipe(Num 1,Fn("x", Binop(Sub, Var "x", Num 1)))
