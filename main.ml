@@ -28,8 +28,9 @@ type tipo =
   | TyFn     of tipo * tipo
   | TyPair   of tipo * tipo
   | TyVar    of int   (* variáveis de tipo -- números *)
-  | TyMaybe of tipo
-  | TyList of tipo
+  | TyMaybe  of tipo
+  | TyList   of tipo
+  | TyEither of tipo * tipo
                       
 type politipo = (int list) * tipo
   
@@ -45,6 +46,7 @@ let rec ftv (tp:tipo) : int list =
   | TyVar n      -> [n]
   | TyMaybe(e) -> ftv e
   | TyList(e) -> ftv e
+  | TyEither(e) -> (ftv t1) (ftv t2)
 
 
                    
@@ -59,6 +61,7 @@ let rec tipo_str (tp:tipo) : string =
   | TyVar  n        -> "X" ^ (string_of_int n)
   | TyMaybe t -> "Maybe "^(tipo_str t)
   | TyList t -> (tipo_str t)^" List"
+  | TyEither (t1,t2) -> "Either " ^ (tipo_str t1) ^ " " ^ (tipo_str t2)
                              
   
 
@@ -70,26 +73,28 @@ type ident = string
 type bop = Sum | Sub | Mult | Eq | Gt | Lt | Geq | Leq 
                                                
 type expr  =
-    Num    of int 
-  | Bool   of bool
-  | Var    of ident
-  | Binop  of bop * expr * expr
-  | Pair   of expr * expr
-  | Fst    of expr
-  | Snd    of expr
-  | If     of expr * expr * expr
-  | Fn     of ident * expr                   
-  | App    of expr * expr
-  | Let    of ident * expr * expr           
-  | LetRec of ident * ident * expr * expr 
-  | Pipe   of expr * expr
+    Num              of int 
+  | Bool             of bool
+  | Var              of ident
+  | Binop            of bop * expr * expr
+  | Pair             of expr * expr
+  | Fst              of expr
+  | Snd              of expr
+  | If               of expr * expr * expr
+  | Fn               of ident * expr                   
+  | App              of expr * expr
+  | Let              of ident * expr * expr           
+  | LetRec           of ident * ident * expr * expr 
+  | Pipe             of expr * expr
   | Nothing
-  | Just of expr
+  | Just             of expr
   | MatchNothingJust of expr * expr * expr
   | Nil
-  | List of expr * expr
-  | MatchList of expr * expr * expr * ident * ident
-              
+  | List             of expr * expr
+  | MatchList        of expr * expr * expr * ident * ident
+  | Left             of expr
+  | Right            of expr
+  | MatchLeftRight   of expr * expr * expr
 
 
 
@@ -130,6 +135,9 @@ let rec expr_str (e:expr) : string  =
   | Nil -> "nil"
   | List (e1, e2) -> (expr_str e1) ^ " :: (" ^ (expr_str e2) ^ ")"
   | MatchList (e1, e2, e3, x, xs) -> "match " ^ (expr_str e1) ^ " with nil -> " ^ (expr_str e2) ^ " | " ^ x ^ "::" ^ xs ^ " -> " ^ expr_str(e3)
+  | Left e1 -> "left " ^ (expr_str e1)
+  | Right e1 -> "right " ^ (expr_str e1)
+  | MatchLeftRight (e1,e2,e3) -> "(match "^(expr_str e1)^" with left x => "^(expr_str e2)^" | right y => "^(expr_str e3)
          
 (* ambientes de tipo - modificados para polimorfismo *) 
  
@@ -210,11 +218,12 @@ let rec appsubs (s:subst) (tp:tipo) : tipo =
   | TyBool            -> TyBool      
   | TyFn     (t1,t2)  -> TyFn     (appsubs s t1, appsubs s t2)
   | TyPair   (t1,t2)  -> TyPair   (appsubs s t1, appsubs s t2) 
-  | TyVar  x        -> (match lookup s x with
-        None        -> TyVar x
-      | Some tp'    -> tp') 
-  | TyMaybe t       -> appsubs s t
-  | TyList t        -> TyList (appsubs s t)
+  | TyVar  x          -> (match lookup s x with
+        None          -> TyVar x
+      | Some tp'      -> tp') 
+  | TyMaybe t         -> appsubs s t
+  | TyList t          -> TyList (appsubs s t)
+  | TyEither (t1,t2)  -> TyEither (appsubs s t1, appsubs s t2)
 
                          
   
@@ -243,7 +252,8 @@ let rec var_in_tipo (v:int) (tp:tipo) : bool =
   | TyPair   (t1,t2)  -> (var_in_tipo v t1) || (var_in_tipo v t2) 
   | TyVar  x          -> v=x
   | TyMaybe t         -> var_in_tipo v t
-  | TyList t          -> var_in_tipo v t 
+  | TyList t          -> var_in_tipo v t
+  | TyEither (t1,t2)  -> (var_in_tipo v t1) || (var_in_tipo v t2)
                          
 
 (* cria novas variáveis para politipos quando estes são instanciados *)
@@ -422,6 +432,27 @@ let rec collect (g:tyenv) (e:expr) : (equacoes_tipo * tipo)  =
       let g''       = (xs, ([], TyList(tP)))::g' in
       let (c3, tp3) = collect g'' e3 in
       (c1@c2@c3@[(tp2, tp3); (tp1, TyList(tP))], tp2)
+  
+  | Left e ->
+      let tA = newvar() in
+      let tB = newvar() in
+      let (c1,tp1) = collect g e1 in
+      (c1@[(tp1,TyEither(TyPair tA, TyVar tB))], tA)
+  
+  | Right e ->
+        let tA = newvar() in
+        let tB = newvar() in
+        let (c1,tp1) = collect g e1 in
+        (c1@[(tp1,TyEither(TyPair tA, TyVar tB))], tB)
+  
+  | MatchLeftRight(e1,e2,e3) ->
+      let (c1,tp1) = collect g e1 in
+      let (c2,tp2) = collect g e2 in
+      let (c3,tp3) = collect g e3 in
+      let tX       = newvar()     in
+      let tP = TyVar tX in
+      let tp' = TyVar tY in
+      (c1@c2@c3@[(tp1,TyEither(tP,tP'));(tp2,tp3)], tp2)
 
       
 
@@ -472,6 +503,8 @@ type valor =
   | VJust of valor
   | VNil 
   | VList of valor * valor
+  | VLeft of valor
+  | VRight of valor
 and
   renv = (ident * valor) list
    
@@ -572,6 +605,14 @@ let rec eval (renv:renv) (e:expr) : valor =
   | Just e ->
       let v = eval renv e in
       VJust v
+  
+  | Left e ->
+      let v = eval renv e in
+      VLeft v
+  
+  | Right e ->
+      let v = eval renv e in
+      VRight v
 
   | MatchNothingJust(e1,e2,e3) ->
       (match eval renv e1 with
@@ -594,6 +635,12 @@ let rec eval (renv:renv) (e:expr) : valor =
            let renv'' = update renv' xs v2 in
            eval renv'' e3
        | _ -> raise BugTypeInfer)
+  
+  | MatchLeftRight(e1,e2,e3) ->
+      (match eval renv e1 with
+         VLeft e -> eval renv e2
+       | VRight e -> eval renv e3
+       | _ -> raise BugTypeInfer )
 
       
 
@@ -654,7 +701,7 @@ let exPipe4 = Pipe(Pipe(Num 10,Fn("x", Binop(Mult, Var "x", Num 3))), Fn("x", Bi
 
 let xs1 = Binop(Sub, Var "x", Num 1)
 let fatapp  =   App(Var "fat", xs1)
-let xfat =Binop(Mult, Var "x", fatapp)
+let xfat = Binop(Mult, Var "x", fatapp)
 let exprfat =  If(Binop(Eq, Var "x", Num 1) , Num 1, xfat)
 let exfat =
   LetRec("fat", "x", exprfat, Var "fat")
@@ -675,4 +722,8 @@ let exMaybe7 = MatchNothingJust(Just aux1, aux1, Num 2)
 let exMaybe8 = MatchNothingJust(Num 5,Num 1,Num 2)
 let exMaybe9 = MatchNothingJust(Nothing,Num 1,Bool true)
 let exMaybe10 = MatchNothingJust(Just (Num 2),Just (Num 3), Just (Bool false))
- 
+
+(*Left Right*)
+let exLeftRight1 = Pair(1, (left (6, (left (7, ()), right (8, ()))), right (7, ())))
+let exLeftRight2 = Pair(8, (left (9, ()), right (left (10, ()), right ())))
+let exLeftRight3 = Pair(7, (left (1, ()), right (10, ())))

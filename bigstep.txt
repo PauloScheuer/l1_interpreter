@@ -73,3 +73,34 @@ Match:
 ρ ⊢ e1 ⇓ just x    ρ ⊢ e3 ⇓ v
 --------------------------------------------------
 ρ ⊢ match e1 with nothing ⇒ e2 | just x ⇒ e3 ⇓ v
+
+
+Left:
+
+(BS-LEFT):
+
+ρ ⊢ e ⇓ v
+--------------------
+ρ ⊢ left e ⇓ left v
+
+Right:
+
+(BS-RIGHT):
+
+ρ ⊢ e ⇓ v
+--------------------
+ρ ⊢ right e ⇓ right v
+
+Match:
+
+(BS-MATCHLEFT):
+
+ρ ⊢ e1 ⇓ left x    ρ ⊢ e2 ⇓ v
+--------------------------------------------------
+ρ ⊢ match e1 with left x ⇒ e2 ⇓ v | just y ⇒ e3
+
+(BS-MATCHRIGHT):
+
+ρ ⊢ e1 ⇓ right y    ρ ⊢ e3 ⇓ v
+--------------------------------------------------
+ρ ⊢ match e1 with left x ⇒ e2 | just y ⇒ e3 ⇓ v
