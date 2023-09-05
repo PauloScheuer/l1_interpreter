@@ -40,6 +40,13 @@ Just:
 Γ ⊢ Just e: maybe T | C
 
 
+Match Nothing:
+
+Γ ⊢ e1: T1 | C1   Γ ⊢ e2: T2 | c2   Γ ⊢ e3: T3 | C3   X new
+----------------------------------------------------------------------------------------------
+Γ ⊢ match e1 with nothing ⇒ e2 | just x ⇒ e3: T2 | C1 ∪ C2 ∪ C3 ∪ {T1 = maybe X} ∪ {T2 = T3}
+
+
 Match Left Right:
 
 Γ ⊢ e1 : T1 | C1                Γ ⊢ e2 : T2 | C2              Γ ⊢ e3 : T3 | C3

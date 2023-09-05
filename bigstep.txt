@@ -83,6 +83,7 @@ Left:
 --------------------
 ρ ⊢ left e ⇓ left v
 
+
 Right:
 
 (BS-RIGHT):
@@ -91,16 +92,17 @@ Right:
 --------------------
 ρ ⊢ right e ⇓ right v
 
-Match:
+
+MatchLeftRight:
 
 (BS-MATCHLEFT):
 
 ρ ⊢ e1 ⇓ left x    ρ ⊢ e2 ⇓ v
 --------------------------------------------------
-ρ ⊢ match e1 with left x ⇒ e2 ⇓ v | just y ⇒ e3
+ρ ⊢ match e1 with left x ⇒ e2 ⇓ v | right y ⇒ e3
 
 (BS-MATCHRIGHT):
 
 ρ ⊢ e1 ⇓ right y    ρ ⊢ e3 ⇓ v
 --------------------------------------------------
-ρ ⊢ match e1 with left x ⇒ e2 | just y ⇒ e3 ⇓ v
+ρ ⊢ match e1 with left x ⇒ e2 | right y ⇒ e3 ⇓ v

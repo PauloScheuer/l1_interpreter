@@ -46,7 +46,7 @@ let rec ftv (tp:tipo) : int list =
   | TyVar n      -> [n]
   | TyMaybe(e) -> ftv e
   | TyList(e) -> ftv e
-  | TyEither(e) -> (ftv t1) (ftv t2)
+  | TyEither(t1, t2) -> (ftv t1) @ (ftv t2)
 
 
                    
@@ -436,23 +436,28 @@ let rec collect (g:tyenv) (e:expr) : (equacoes_tipo * tipo)  =
   | Left e ->
       let tA = newvar() in
       let tB = newvar() in
-      let (c1,tp1) = collect g e1 in
-      (c1@[(tp1,TyEither(TyPair tA, TyVar tB))], tA)
+      let tAA = TyVar tA in
+      let tBB = TyVar tB in
+      let (c1,tp1) = collect g e in
+      (c1@[(tp1,TyEither(TyPair(tAA, tBB), tAA))], tAA)
   
   | Right e ->
         let tA = newvar() in
         let tB = newvar() in
-        let (c1,tp1) = collect g e1 in
-        (c1@[(tp1,TyEither(TyPair tA, TyVar tB))], tB)
+        let tAA = TyVar tA in
+        let tBB = TyVar tB in
+        let (c1,tp1) = collect g e in
+        (c1@[(tp1,TyEither(TyPair(tAA, tBB), tBB))], tBB)
   
   | MatchLeftRight(e1,e2,e3) ->
       let (c1,tp1) = collect g e1 in
       let (c2,tp2) = collect g e2 in
       let (c3,tp3) = collect g e3 in
       let tX       = newvar()     in
+      let tY       = newvar()     in
       let tP = TyVar tX in
-      let tp' = TyVar tY in
-      (c1@c2@c3@[(tp1,TyEither(tP,tP'));(tp2,tp3)], tp2)
+      let tPP = TyVar tY in
+      (c1@c2@c3@[(tp1,TyEither(tP, tPP));(tp2, tp3)], tp2)
 
       
 
@@ -722,8 +727,3 @@ let exMaybe7 = MatchNothingJust(Just aux1, aux1, Num 2)
 let exMaybe8 = MatchNothingJust(Num 5,Num 1,Num 2)
 let exMaybe9 = MatchNothingJust(Nothing,Num 1,Bool true)
 let exMaybe10 = MatchNothingJust(Just (Num 2),Just (Num 3), Just (Bool false))
-
-(*Left Right*)
-let exLeftRight1 = Pair(1, (left (6, (left (7, ()), right (8, ()))), right (7, ())))
-let exLeftRight2 = Pair(8, (left (9, ()), right (left (10, ()), right ())))
-let exLeftRight3 = Pair(7, (left (1, ()), right (10, ())))
